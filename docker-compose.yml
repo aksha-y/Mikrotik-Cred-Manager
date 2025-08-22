@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_NAME=mikrotik_cred_manager
+      - DB_USER=mikrotik_user
+      - DB_PASSWORD=secure_password_123
+      - SECRET_KEY=your-super-secret-key-change-this-in-production
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=false
+      - SECURE_COOKIES=false
+    depends_on:
+      - db
+    volumes:
+      - ./app.log:/app/app.log
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password_123
+      - MYSQL_DATABASE=mikrotik_cred_manager
+      - MYSQL_USER=mikrotik_user
+      - MYSQL_PASSWORD=secure_password_123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+
+volumes:
+  mysql_data:

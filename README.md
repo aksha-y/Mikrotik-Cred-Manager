@@ -51,6 +51,28 @@ A secure web-based platform for managing temporary credentials on MikroTik devic
 
 ## 🚀 Installation
 
+## ⚡ Quick Installation (Automated)
+
+For a quick setup, use the provided installation scripts:
+
+### Windows Users
+```cmd
+install.bat
+```
+
+### Linux/Mac Users
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+### Docker Users
+```bash
+docker-compose up -d
+```
+
+## 📋 Manual Installation
+
 ### Prerequisites
 - **Python 3.8+** (Recommended: Python 3.13)
 - **MySQL 5.7+** or **MariaDB 10.3+**
@@ -89,7 +111,12 @@ FLUSH PRIVILEGES;
 ```
 
 ### 5. Configure Environment
-Create a `.env` file in the project root (never commit this file):
+Copy the example environment file and configure it:
+```bash
+cp .env.example .env
+```
+
+Edit the `.env` file with your settings (never commit this file):
 ```env
 # Local development settings
 DB_HOST=localhost
