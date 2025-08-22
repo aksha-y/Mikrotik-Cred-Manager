@@ -1,0 +1,501 @@
+{% extends "base.html" %}
+
+{% block title %}My Requests - Mikrotik-Manager{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Alerts Container -->
+    <div id="alerts-container"></div>
+    
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-history text-primary me-2"></i>
+                        My Credential Requests
+                    </h1>
+                    <p class="text-muted mb-0">View and manage your credential request history</p>
+                </div>
+                <div>
+                    <a href="/request-credentials" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>New Request
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter and Search -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Filter by Status</label>
+                            <select class="form-select" id="statusFilter">
+                                <option value="">All Status</option>
+                                <option value="active">Active</option>
+                                <option value="expired">Expired</option>
+                                <option value="revoked">Revoked</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Search IP Address</label>
+                            <input type="text" class="form-control" id="ipSearch" placeholder="192.168.1.1">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Date Range</label>
+                            <select class="form-select" id="dateFilter">
+                                <option value="">All Time</option>
+                                <option value="today">Today</option>
+                                <option value="week">This Week</option>
+                                <option value="month">This Month</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Requests Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-list me-2"></i>
+                            Request History
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="refreshTable()">
+                                <i class="fas fa-sync-alt me-1"></i>Refresh
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="exportRequests()">
+                                <i class="fas fa-download me-1"></i>Export
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if requests %}
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="requestsTable">
+                            <thead>
+                                <tr>
+                                    <th>Device</th>
+                                    <th>Purpose</th>
+                                    <th>Duration</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Expires/Expired</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for request in requests %}
+                                <tr data-status="{{ request.status }}" data-ip="{{ request.wan_ip }}" data-date="{{ request.created_at.strftime('%Y-%m-%d') }}">
+                                    <td>
+                                        <div>
+                                            <strong>{{ request.wan_ip }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ request.device_identity or 'Unknown' }}</small>
+                                            <br>
+                                            <small class="text-muted font-monospace">{{ request.temp_username }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="text-truncate d-inline-block" style="max-width: 200px;" 
+                                              data-bs-toggle="tooltip" title="{{ request.purpose }}">
+                                            {{ request.purpose }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ request.duration_minutes }} min</span>
+                                    </td>
+                                    <td>
+                                        {% if request.status == 'active' %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check-circle me-1"></i>Active
+                                            </span>
+                                            <br>
+                                            <small class="text-muted" id="countdown-{{ request.id }}">
+                                                <i class="fas fa-clock me-1"></i>
+                                                <span class="countdown" data-expires="{{ request.expires_at.isoformat() }}">
+                                                    Calculating...
+                                                </span>
+                                            </small>
+                                        {% elif request.status == 'expired' %}
+                                            <span class="badge bg-warning">
+                                                <i class="fas fa-clock me-1"></i>Expired
+                                            </span>
+                                        {% elif request.status == 'revoked' %}
+                                            <span class="badge bg-danger">
+                                                <i class="fas fa-times-circle me-1"></i>Revoked
+                                            </span>
+                                            {% if request.revoked_at %}
+                                            <br>
+                                            <small class="text-muted">{{ request.revoked_at.strftime('%m/%d %H:%M') }}</small>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div>{{ request.created_at.strftime('%Y-%m-%d') }}</div>
+                                        <small class="text-muted">{{ request.created_at.strftime('%H:%M:%S') }}</small>
+                                    </td>
+                                    <td>
+                                        <div>{{ request.expires_at.strftime('%Y-%m-%d') }}</div>
+                                        <small class="text-muted">{{ request.expires_at.strftime('%H:%M:%S') }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group-vertical btn-group-sm" role="group">
+                                            {% if request.status == 'active' %}
+                                            <button class="btn btn-outline-info btn-sm" 
+                                                    onclick="showCredentials('{{ request.temp_username }}', '{{ request.temp_password }}', '{{ request.wan_ip }}', '{{ request.device_identity or '' }}')">
+                                                <i class="fas fa-eye me-1"></i>View
+                                            </button>
+                                            <button class="btn btn-outline-danger btn-sm" 
+                                                    onclick="revokeCredentials({{ request.id }})">
+                                                <i class="fas fa-times me-1"></i>Revoke
+                                            </button>
+                                            {% else %}
+                                            <button class="btn btn-outline-secondary btn-sm" disabled>
+                                                <i class="fas fa-eye-slash me-1"></i>Expired
+                                            </button>
+                                            {% endif %}
+                                            
+                                            <button class="btn btn-outline-primary btn-sm" 
+                                                    onclick="showRequestDetails({{ request.id }}, '{{ request.wan_ip }}', '{{ request.purpose }}', '{{ request.duration_minutes }}', '{{ request.created_at.isoformat() }}', '{{ request.expires_at.isoformat() }}', '{{ request.status }}', '{{ request.device_identity or '' }}')">
+                                                <i class="fas fa-info me-1"></i>Details
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No requests found</h5>
+                        <p class="text-muted">You haven't made any credential requests yet.</p>
+                        <a href="/request-credentials" class="btn btn-primary">
+                            <i class="fas fa-key me-2"></i>Request Your First Credentials
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Credentials Modal -->
+<div class="modal fade" id="credentialsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-key me-2"></i>Active Credentials
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Security Notice:</strong> These credentials are temporary and will expire automatically.
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>Device IP:</strong></label>
+                    <input type="text" class="form-control" id="modal-ip" readonly>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>Username:</strong></label>
+                    <div class="input-group">
+                        <input type="text" class="form-control font-monospace" id="modal-username" readonly>
+                        <button class="btn btn-outline-secondary" onclick="copyToClipboard('modal-username')">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>Password:</strong></label>
+                    <div class="input-group">
+                        <input type="password" class="form-control font-monospace" id="modal-password" readonly>
+                        <button class="btn btn-outline-secondary" onclick="toggleModalPassword()">
+                            <i class="fas fa-eye" id="modal-toggle-icon"></i>
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="copyToClipboard('modal-password')">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="d-grid">
+                    <button class="btn btn-success" onclick="copyAllModalCredentials()">
+                        <i class="fas fa-copy me-2"></i>Copy All Credentials
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Request Details Modal -->
+<div class="modal fade" id="detailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-info-circle me-2"></i>Request Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detailsModalBody">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Update countdowns for active requests
+function updateCountdowns() {
+    document.querySelectorAll('.countdown').forEach(element => {
+        const expiresAt = new Date(element.dataset.expires);
+        const now = new Date();
+        const timeLeft = expiresAt - now;
+        
+        if (timeLeft <= 0) {
+            element.textContent = 'Expired';
+            element.parentElement.innerHTML = '<i class="fas fa-clock me-1"></i><span class="text-danger">Expired</span>';
+        } else {
+            const minutes = Math.floor(timeLeft / 60000);
+            const seconds = Math.floor((timeLeft % 60000) / 1000);
+            
+            if (minutes > 0) {
+                element.textContent = `${minutes}m ${seconds}s left`;
+            } else {
+                element.textContent = `${seconds}s left`;
+            }
+            
+            if (minutes < 5) {
+                element.className = 'countdown text-danger';
+            } else if (minutes < 15) {
+                element.className = 'countdown text-warning';
+            } else {
+                element.className = 'countdown text-success';
+            }
+        }
+    });
+}
+
+// Start countdown updates
+setInterval(updateCountdowns, 1000);
+updateCountdowns(); // Initial call
+
+// Filter functionality
+document.getElementById('statusFilter').addEventListener('change', filterTable);
+document.getElementById('ipSearch').addEventListener('input', filterTable);
+document.getElementById('dateFilter').addEventListener('change', filterTable);
+
+function filterTable() {
+    const statusFilter = document.getElementById('statusFilter').value;
+    const ipSearch = document.getElementById('ipSearch').value.toLowerCase();
+    const dateFilter = document.getElementById('dateFilter').value;
+    
+    const rows = document.querySelectorAll('#requestsTable tbody tr');
+    
+    rows.forEach(row => {
+        let show = true;
+        
+        // Status filter
+        if (statusFilter && row.dataset.status !== statusFilter) {
+            show = false;
+        }
+        
+        // IP search
+        if (ipSearch && !row.dataset.ip.toLowerCase().includes(ipSearch)) {
+            show = false;
+        }
+        
+        // Date filter
+        if (dateFilter) {
+            const rowDate = new Date(row.dataset.date);
+            const today = new Date();
+            
+            switch (dateFilter) {
+                case 'today':
+                    if (rowDate.toDateString() !== today.toDateString()) {
+                        show = false;
+                    }
+                    break;
+                case 'week':
+                    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    if (rowDate < weekAgo) {
+                        show = false;
+                    }
+                    break;
+                case 'month':
+                    const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+                    if (rowDate < monthAgo) {
+                        show = false;
+                    }
+                    break;
+            }
+        }
+        
+        row.style.display = show ? '' : 'none';
+    });
+}
+
+function revokeCredentials(requestId) {
+    if (confirm('Are you sure you want to revoke these credentials? This action cannot be undone.')) {
+        fetch(`/revoke-credentials/${requestId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Credentials revoked successfully!', 'success');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showAlert('Failed to revoke credentials: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('Error revoking credentials: ' + error.message, 'danger');
+        });
+    }
+}
+
+function showCredentials(username, password, ip, identity) {
+    document.getElementById('modal-ip').value = ip + (identity ? `  [${identity}]` : '');
+    document.getElementById('modal-username').value = username;
+    document.getElementById('modal-password').value = password;
+    new bootstrap.Modal(document.getElementById('credentialsModal')).show();
+}
+
+function showRequestDetails(id, ip, purpose, duration, created, expires, status, identity) {
+    const createdDate = new Date(created);
+    const expiresDate = new Date(expires);
+    
+    const content = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6 class="text-primary">Request Information</h6>
+                <table class="table table-sm">
+                    <tr><td><strong>Request ID:</strong></td><td>#${id}</td></tr>
+                    <tr><td><strong>Device:</strong></td><td class="font-monospace">${ip}${identity ? `  [${identity}]` : ''}</td></tr>
+                    <tr><td><strong>Duration:</strong></td><td>${duration} minutes</td></tr>
+                    <tr><td><strong>Status:</strong></td><td>
+                        <span class="badge bg-${status === 'active' ? 'success' : status === 'expired' ? 'warning' : 'danger'}">
+                            ${status.toUpperCase()}
+                        </span>
+                    </td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6 class="text-primary">Timeline</h6>
+                <table class="table table-sm">
+                    <tr><td><strong>Created:</strong></td><td>${createdDate.toLocaleString()}</td></tr>
+                    <tr><td><strong>Expires:</strong></td><td>${expiresDate.toLocaleString()}</td></tr>
+                    <tr><td><strong>Duration:</strong></td><td>${Math.round((expiresDate - createdDate) / 60000)} minutes</td></tr>
+                </table>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-12">
+                <h6 class="text-primary">Purpose</h6>
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <p class="mb-0">${purpose}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('detailsModalBody').innerHTML = content;
+    new bootstrap.Modal(document.getElementById('detailsModal')).show();
+}
+
+function copyToClipboard(elementId) {
+    const element = document.getElementById(elementId);
+    element.select();
+    element.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(element.value);
+    showAlert('Copied to clipboard!', 'success');
+}
+
+function toggleModalPassword() {
+    const passwordField = document.getElementById('modal-password');
+    const toggleIcon = document.getElementById('modal-toggle-icon');
+    
+    if (passwordField.type === 'password') {
+        passwordField.type = 'text';
+        toggleIcon.className = 'fas fa-eye-slash';
+    } else {
+        passwordField.type = 'password';
+        toggleIcon.className = 'fas fa-eye';
+    }
+}
+
+function copyAllModalCredentials() {
+    const ip = document.getElementById('modal-ip').value;
+    const username = document.getElementById('modal-username').value;
+    const password = document.getElementById('modal-password').value;
+    const text = `IP: ${ip}\nUsername: ${username}\nPassword: ${password}`;
+    
+    navigator.clipboard.writeText(text);
+    showAlert('All credentials copied to clipboard!', 'success');
+}
+
+function refreshTable() {
+    location.reload();
+}
+
+function exportRequests() {
+    // Simple CSV export
+    const rows = Array.from(document.querySelectorAll('#requestsTable tbody tr:not([style*="display: none"])'));
+    let csv = 'Device IP,Purpose,Duration,Status,Created,Expires\n';
+    
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        const ip = row.dataset.ip;
+        const purpose = cells[1].textContent.trim().replace(/"/g, '""');
+        const duration = cells[2].textContent.trim();
+        const status = row.dataset.status;
+        const created = cells[4].textContent.trim().replace(/\n/g, ' ');
+        const expires = cells[5].textContent.trim().replace(/\n/g, ' ');
+        
+        csv += `"${ip}","${purpose}","${duration}","${status}","${created}","${expires}"\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `my-requests-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    
+    showAlert('Requests exported successfully!', 'success');
+}
+</script>
+{% endblock %}
