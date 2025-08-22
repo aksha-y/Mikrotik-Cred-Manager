@@ -57,19 +57,99 @@ For a quick setup, use the provided installation scripts:
 
 ### Windows Users
 ```cmd
+# First clone the repository
+git clone https://github.com/aksha-y/Mikrotik-Cred-Manager.git
+cd Mikrotik-Cred-Manager
+
+# Then run the installer
 install.bat
 ```
 
 ### Linux/Mac Users
 ```bash
+# First clone the repository
+git clone https://github.com/aksha-y/Mikrotik-Cred-Manager.git
+cd Mikrotik-Cred-Manager
+
+# Then run the installer
 chmod +x install.sh
 ./install.sh
 ```
 
 ### Docker Users
 ```bash
+# First clone the repository
+git clone https://github.com/aksha-y/Mikrotik-Cred-Manager.git
+cd Mikrotik-Cred-Manager
+
+# Then run with Docker
 docker-compose up -d
 ```
+
+## 🐧 Linux Server Deployment
+
+For detailed cloud server deployment instructions, see **[LINUX_SERVER_SETUP.md](LINUX_SERVER_SETUP.md)**
+
+### 🚀 One-Command Server Setup (Recommended)
+```bash
+# Clone repository and run complete server setup
+git clone https://github.com/aksha-y/Mikrotik-Cred-Manager.git
+cd Mikrotik-Cred-Manager
+chmod +x setup_server.sh
+./setup_server.sh
+```
+**This script will:**
+- ✅ Update system and install all prerequisites
+- ✅ Install and configure MySQL
+- ✅ Set up Python environment and dependencies
+- ✅ Configure firewall rules
+- ✅ Guide you through database and environment setup
+- ✅ Initialize the application
+- ✅ Optionally set up production systemd service
+
+### Manual Linux Server Setup
+```bash
+# 1. Update system and install prerequisites
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y python3 python3-pip python3-venv git mysql-server
+
+# 2. Start and secure MySQL
+sudo systemctl start mysql
+sudo systemctl enable mysql
+sudo mysql_secure_installation
+
+# 3. Clone and setup application
+git clone https://github.com/aksha-y/Mikrotik-Cred-Manager.git
+cd Mikrotik-Cred-Manager
+chmod +x install.sh
+./install.sh
+
+# 4. Create database
+sudo mysql -u root -p
+# Run in MySQL prompt:
+# CREATE DATABASE mikrotik_cred_manager;
+# CREATE USER 'mikrotik_user'@'localhost' IDENTIFIED BY 'your_password';
+# GRANT ALL PRIVILEGES ON mikrotik_cred_manager.* TO 'mikrotik_user'@'localhost';
+# FLUSH PRIVILEGES;
+# EXIT;
+
+# 5. Configure environment
+nano .env  # Update database credentials
+
+# 6. Initialize application
+source .venv/bin/activate
+python init_db.py
+python fix_admin_password.py
+
+# 7. Configure firewall
+sudo ufw allow 8000/tcp
+sudo ufw --force enable
+
+# 8. Start application
+python run.py
+```
+
+**Access:** `http://your-server-ip:8000` | Login: `admin/admin123`
 
 ## 📋 Manual Installation
 
